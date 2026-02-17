@@ -64,8 +64,17 @@ public class ChipStack : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning($"Could not load chip sprite: {denom.spriteName}");
+                Debug.LogError($"❌ Could not load chip sprite: {denom.spriteName} from Resources folder!");
             }
+        }
+        
+        if (chipSprites.Count == 0)
+        {
+            Debug.LogError("❌ NO CHIP SPRITES LOADED! Make sure chip images are in Assets/Resources/ folder!");
+        }
+        else
+        {
+            Debug.Log($"✅ Loaded {chipSprites.Count} chip sprites");
         }
     }
 

@@ -42,6 +42,19 @@ public class ChipStackAnimator : MonoBehaviour
             {
                 chipSprites[denom] = sprite;
             }
+            else
+            {
+                Debug.LogError($"❌ Could not load chip sprite: chip{denom} from Resources folder!");
+            }
+        }
+        
+        if (chipSprites.Count == 0)
+        {
+            Debug.LogError("❌ NO CHIP SPRITES LOADED for animations! Make sure chip images are in Assets/Resources/ folder!");
+        }
+        else
+        {
+            Debug.Log($"✅ ChipStackAnimator: Loaded {chipSprites.Count} chip sprites for animations");
         }
     }
 
