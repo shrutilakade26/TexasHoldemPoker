@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using PokerEngine.State;
@@ -27,7 +27,7 @@ namespace PokerEngine.Engine
 
         public List<Pot> BuildPots(GameState state, IReadOnlyCollection<Guid> eligiblePlayers)
         {
-            // Get all contributions sorted by amount
+            // Get all contributions > 0, sorted by amount
             var contributions = state.TotalContributions
                 .Where(kv => kv.Value > 0)
                 .OrderBy(kv => kv.Value)
@@ -42,48 +42,53 @@ namespace PokerEngine.Engine
             var pots = new List<Pot>();
             decimal previousLevel = 0m;
 
-            // Build side pots at each contribution level
-            foreach (var kvp in contributions)
+            // Build pots using standard side‑pot logic:
+            // for each DISTINCT contribution level, create a pot slice funded
+            // by all players whose total contribution reaches at least that level.
+            var levels = contributions
+                .Select(c => c.Value)
+                .Distinct()
+                .OrderBy(v => v);
+
+            foreach (var currentLevel in levels)
             {
-                var currentLevel = kvp.Value;
                 var slice = currentLevel - previousLevel;
-                
-                if (slice > 0)
+                if (slice <= 0)
                 {
-                    // Count all contributors at or above this level
-                    var contributorsAtThisLevel = contributions
-                        .Where(c => c.Value >= currentLevel)
-                        .Select(c => c.Key)
-                        .ToList();
-                    
-                    // Also include contributors who contributed less but already processed
-                    var allContributors = contributions
-                        .Where(c => c.Value >= previousLevel && c.Value > 0)
-                        .Select(c => c.Key)
-                        .ToList();
-                    
-                    var amount = slice * allContributors.Count;
-                    
-                    // Eligible players for this pot: those who contributed AND are not folded
-                    var eligibleForPot = allContributors
-                        .Where(id => eligiblePlayers.Contains(id))
-                        .ToArray();
-                    
-                    if (eligibleForPot.Length > 0)
-                    {
-                        pots.Add(new Pot(amount, eligibleForPot));
-                    }
-                    else if (amount > 0)
-                    {
-                        // Dead money - no eligible players, add to previous pot or create orphan pot
-                        if (pots.Count > 0)
-                        {
-                            var lastPot = pots[^1];
-                            pots[^1] = new Pot(lastPot.Amount + amount, lastPot.EligiblePlayers);
-                        }
-                    }
+                    previousLevel = currentLevel;
+                    continue;
                 }
-                
+
+                // All players whose total contribution reaches this level
+                var contributorsAtThisLevel = contributions
+                    .Where(c => c.Value >= currentLevel)
+                    .Select(c => c.Key)
+                    .ToList();
+
+                if (contributorsAtThisLevel.Count == 0)
+                {
+                    previousLevel = currentLevel;
+                    continue;
+                }
+
+                var amount = slice * contributorsAtThisLevel.Count;
+
+                // Eligible players for this pot: contributors who have not folded
+                var eligibleForPot = contributorsAtThisLevel
+                    .Where(id => eligiblePlayers.Contains(id))
+                    .ToArray();
+
+                if (eligibleForPot.Length > 0)
+                {
+                    pots.Add(new Pot(amount, eligibleForPot));
+                }
+                else if (amount > 0 && pots.Count > 0)
+                {
+                    // Dead money - roll into previous pot if possible
+                    var lastPot = pots[^1];
+                    pots[^1] = new Pot(lastPot.Amount + amount, lastPot.EligiblePlayers);
+                }
+
                 previousLevel = currentLevel;
             }
 

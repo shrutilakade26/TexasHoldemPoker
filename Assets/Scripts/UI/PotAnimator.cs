@@ -22,17 +22,62 @@ public class PotAnimator : MonoBehaviour
 
     private void Awake()
     {
-        // Auto-find or create ChipStackAnimator
-        if (chipAnimator == null)
+        EnsureChipAnimatorSetup();
+    }
+
+    private void Start()
+    {
+        // Double-check setup in Start (after all Awake calls)
+        EnsureChipAnimatorSetup();
+    }
+
+    private void EnsureChipAnimatorSetup()
+    {
+        // Auto-find or create ChipStackAnimator if chip animations are enabled
+        if (useChipAnimations && chipAnimator == null)
         {
             chipAnimator = FindFirstObjectByType<ChipStackAnimator>();
             
-            if (chipAnimator == null && useChipAnimations)
+            if (chipAnimator == null)
             {
+                // CRITICAL: ChipStackAnimator creates UI elements, so it MUST be under a Canvas!
+                Canvas canvas = FindFirstObjectByType<Canvas>();
+                if (canvas == null)
+                {
+                    Debug.LogError("No Canvas found in scene! ChipStackAnimator needs a Canvas parent for UI elements to render!");
+                    return;
+                }
+                
                 GameObject animObj = new GameObject("ChipStackAnimator");
-                animObj.transform.SetParent(transform.root);
+                animObj.transform.SetParent(canvas.transform, false);
                 chipAnimator = animObj.AddComponent<ChipStackAnimator>();
             }
+            else
+            {
+                // Verify it's under a Canvas
+                Canvas parentCanvas = chipAnimator.GetComponentInParent<Canvas>();
+                if (parentCanvas == null)
+                {
+                    Debug.LogWarning("ChipStackAnimator is not under a Canvas! Moving it to Canvas...");
+                    Canvas canvas = FindFirstObjectByType<Canvas>();
+                    if (canvas != null)
+                    {
+                        chipAnimator.transform.SetParent(canvas.transform, false);
+                    }
+                }
+            }
+        }
+        
+        // Warn if chip animations are enabled but setup failed
+        if (useChipAnimations && chipAnimator == null)
+        {
+            Debug.LogWarning("PotAnimator: useChipAnimations is TRUE but chipAnimator is still null! Chip animations may not work.");
+        }
+        
+        // Warn if centerPotPosition is not set
+        if (centerPotPosition == null)
+        {
+            Debug.LogWarning("PotAnimator: centerPotPosition is not assigned! Pot animations will not work. Assign it in the Inspector.");
         }
     }
 
@@ -59,52 +104,47 @@ public class PotAnimator : MonoBehaviour
     /// </summary>
     public IEnumerator AnimateCollectBets(BetDisplay[] betDisplays)
     {
-        Debug.Log($"AnimateCollectBets called. betDisplays={betDisplays?.Length}, useChipAnimations={useChipAnimations}, chipAnimator={chipAnimator}");
-        
         if (betDisplays == null)
         {
-            Debug.LogWarning("AnimateCollectBets: betDisplays is null!");
             yield break;
         }
         
         if (!useChipAnimations)
         {
-            Debug.LogWarning("AnimateCollectBets: useChipAnimations is FALSE. Enable it in Inspector!");
             yield break;
         }
         
         if (chipAnimator == null)
         {
-            Debug.LogWarning("AnimateCollectBets: chipAnimator is null, trying to find/create one...");
             chipAnimator = FindFirstObjectByType<ChipStackAnimator>();
             
             if (chipAnimator == null)
             {
+                Canvas canvas = FindFirstObjectByType<Canvas>();
+                if (canvas == null)
+                {
+                    Debug.LogError("No Canvas found! Cannot create ChipStackAnimator!");
+                    yield break;
+                }
+                
                 GameObject animObj = new GameObject("ChipStackAnimator");
-                animObj.transform.SetParent(transform.root);
+                animObj.transform.SetParent(canvas.transform, false);
                 chipAnimator = animObj.AddComponent<ChipStackAnimator>();
-                Debug.Log("Created ChipStackAnimator!");
             }
         }
-
-        int animCount = 0;
         
         // Start all animations at once (they run in parallel)
         foreach (var betDisplay in betDisplays)
         {
             if (betDisplay != null && betDisplay.GetCurrentBet() > 0)
             {
-                Debug.Log($"Animating chips: ${betDisplay.GetCurrentBet()} from {betDisplay.name} to pot");
                 StartCoroutine(chipAnimator.AnimateChipsMoving(
                     betDisplay.transform.position,
                     centerPotPosition.position,
                     betDisplay.GetCurrentBet()
                 ));
-                animCount++;
             }
         }
-        
-        Debug.Log($"AnimateCollectBets: Started {animCount} chip animations");
 
         // Wait for animations to complete
         yield return new WaitForSeconds(0.8f);
@@ -118,13 +158,11 @@ public class PotAnimator : MonoBehaviour
     {
         if (bets == null || bets.Count == 0)
         {
-            Debug.Log("AnimateBetsFromPositions: No bets to animate");
             yield break;
         }
         
         if (centerPotPosition == null)
         {
-            Debug.LogWarning("AnimateBetsFromPositions: centerPotPosition is null!");
             yield break;
         }
         
@@ -134,20 +172,24 @@ public class PotAnimator : MonoBehaviour
             chipAnimator = FindFirstObjectByType<ChipStackAnimator>();
             if (chipAnimator == null)
             {
+                Canvas canvas = FindFirstObjectByType<Canvas>();
+                if (canvas == null)
+                {
+                    Debug.LogError("No Canvas found! Cannot create ChipStackAnimator!");
+                    yield break;
+                }
+                
                 GameObject animObj = new GameObject("ChipStackAnimator");
-                animObj.transform.SetParent(transform.root);
+                animObj.transform.SetParent(canvas.transform, false);
                 chipAnimator = animObj.AddComponent<ChipStackAnimator>();
             }
         }
-        
-        Debug.Log($"AnimateBetsFromPositions: Animating {bets.Count} bet positions to pot");
         
         // Start all animations at once
         foreach (var (position, amount) in bets)
         {
             if (position != null && amount > 0)
             {
-                Debug.Log($"Flying ${amount} from {position.name} to pot");
                 StartCoroutine(chipAnimator.AnimateChipsMoving(
                     position.position,
                     centerPotPosition.position,
@@ -164,8 +206,28 @@ public class PotAnimator : MonoBehaviour
     {
         if (centerPotPosition == null || winnerPosition == null)
         {
-            Debug.LogWarning("Missing pot animation positions");
             yield break;
+        }
+
+        // Ensure chip animator is set up if chip animations are enabled
+        if (useChipAnimations && chipAnimator == null)
+        {
+            chipAnimator = FindFirstObjectByType<ChipStackAnimator>();
+            
+            if (chipAnimator == null)
+            {
+                // CRITICAL: Must be under a Canvas for UI elements to render!
+                Canvas canvas = FindFirstObjectByType<Canvas>();
+                if (canvas == null)
+                {
+                    Debug.LogError("No Canvas found! ChipStackAnimator cannot create UI elements without a Canvas parent!");
+                    yield break;
+                }
+                
+                GameObject animObj = new GameObject("ChipStackAnimator");
+                animObj.transform.SetParent(canvas.transform, false);
+                chipAnimator = animObj.AddComponent<ChipStackAnimator>();
+            }
         }
 
         // Use chip animations

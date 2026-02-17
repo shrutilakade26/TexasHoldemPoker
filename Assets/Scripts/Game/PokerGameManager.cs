@@ -341,11 +341,21 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
             // 2. Evaluate hands and determine winners
             var winners = PerformShowdownEvaluation();
             
-            // 3. Display winner(s) and hand rankings
+            // 3. Display winner(s) and hand rankings (panel stays visible)
             yield return StartCoroutine(DisplayWinners(winners));
             
-            // 4. Animate pot transfer to winner(s)
+            // 4. Animate pot transfer to winner(s) (chips flying to winner)
+            // Winner panel stays visible during chip animation
             yield return StartCoroutine(AnimatePotTransfer(winners));
+            
+            // 5. Hide winner panel after chip animation completes
+            if (showdownUI != null)
+            {
+                showdownUI.HideWinnerPanel();
+            }
+            
+            // 6. Brief pause after all animations complete before countdown
+            yield return new WaitForSeconds(1f);
         }
         else if (gameState.HandComplete)
         {
@@ -358,7 +368,7 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
                 var winAmount = gameState.TotalContributions.Values.Sum();
                 Debug.Log($"{winner.Name} wins ${winAmount} by fold!");
                 
-                // Show winner announcement
+                // Show winner announcement (panel stays visible)
                 yield return StartCoroutine(DisplayFoldWinner(winner, winAmount));
                 
                 // Animate pot transfer
@@ -367,6 +377,15 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
                     (winner, winAmount, "Won by Fold") 
                 };
                 yield return StartCoroutine(AnimatePotTransfer(winners));
+                
+                // Hide winner panel after chip animation
+                if (showdownUI != null)
+                {
+                    showdownUI.HideWinnerPanel();
+                }
+                
+                // Brief pause after chip animation
+                yield return new WaitForSeconds(1f);
             }
         }
 
@@ -444,7 +463,7 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
         
         foreach (var (player, amount, handName) in winners)
         {
-            Debug.Log($"🏆 {player.Name} wins ${amount} with {handName}!");
+            Debug.Log($"{player.Name} wins ${amount} with {handName}!");
             
             // Display winner UI
             if (showdownUI != null)
@@ -460,7 +479,7 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
 
     private IEnumerator DisplayFoldWinner(Player winner, decimal amount)
     {
-        Debug.Log($"🏆 {winner.Name} wins ${amount} - All others folded!");
+        Debug.Log($"{winner.Name} wins ${amount} - All others folded!");
         
         // Display fold winner UI
         if (showdownUI != null)
@@ -475,25 +494,20 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
 
     private IEnumerator AnimatePotTransfer(List<(Player player, decimal amount, string handName)> winners)
     {
-        Debug.Log("Animating pot transfer...");
+        if (potAnimator == null || uiManager == null)
+        {
+            yield break;
+        }
         
         foreach (var (player, amount, handName) in winners)
         {
-            Debug.Log($"💰 Transferring ${amount} to {player.Name}");
-            
             // Find player's UI panel for animation target
-            if (potAnimator != null && uiManager != null)
+            Transform playerTransform = uiManager.GetPlayerPanelTransform(player.SeatIndex);
+            
+            if (playerTransform != null)
             {
-                Transform playerTransform = uiManager.GetPlayerPanelTransform(player.SeatIndex);
-                if (playerTransform != null)
-                {
-                    // Animate chips flying from pot to winner
-                    yield return StartCoroutine(potAnimator.AnimatePotToWinner(playerTransform, amount));
-                }
-                else
-                {
-                    yield return new WaitForSeconds(0.5f);
-                }
+                // Animate chips flying from pot to winner
+                yield return StartCoroutine(potAnimator.AnimatePotToWinner(playerTransform, amount));
             }
             else
             {
@@ -507,7 +521,8 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
             uiManager.UpdateGameState(gameState);
         }
         
-        yield return new WaitForSeconds(1f);
+        // Wait after chip animation completes so players can see the result
+        yield return new WaitForSeconds(2f);
     }
 
     /// <summary>
@@ -608,7 +623,7 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
         foreach (var payout in payouts.Where(p => p.Value > 0))
         {
             var player = gameState.Players.First(p => p.Id == payout.Key);
-            Debug.Log($"💰 {player.Name} wins ${payout.Value}! New stack: ${player.Stack}");
+            Debug.Log($"{player.Name} wins ${payout.Value}! New stack: ${player.Stack}");
         }
 
         // Update UI with showdown cards (show all active players' cards)

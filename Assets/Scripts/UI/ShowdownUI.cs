@@ -53,9 +53,9 @@ public class ShowdownUI : MonoBehaviour
             yield break;
         }
 
-        // Set winner information
+        // Set winner information (removed emoji to avoid TMP font warnings)
         if (winnerNameText != null)
-            winnerNameText.text = $"🏆 {playerName} WINS! 🏆";
+            winnerNameText.text = $"{playerName} WINS!";
         
         if (winnerAmountText != null)
             winnerAmountText.text = $"${amount}";
@@ -84,15 +84,32 @@ public class ShowdownUI : MonoBehaviour
         // Scale pulse animation
         yield return StartCoroutine(PulseScale(winnerPanel.transform));
 
-        // Display for duration
+        // Display for duration (but keep visible during chip animation)
         yield return new WaitForSeconds(displayDuration - 1f);
 
-        // Stop glow
+        // Stop glow (but keep panel visible for chip animation)
         if (glowCoroutine != null)
         {
             StopCoroutine(glowCoroutine);
         }
 
+        // Don't slide out yet - keep panel visible during chip animation
+        // Panel will be hidden by HideWinnerPanel() after chip animation completes
+    }
+
+    /// <summary>
+    /// Hide the winner panel after chip animation completes.
+    /// </summary>
+    public void HideWinnerPanel()
+    {
+        if (winnerPanel != null && winnerPanel.activeSelf)
+        {
+            StartCoroutine(SlideOutAndHide());
+        }
+    }
+
+    private IEnumerator SlideOutAndHide()
+    {
         // Slide out
         yield return StartCoroutine(SlideOutPanel());
 

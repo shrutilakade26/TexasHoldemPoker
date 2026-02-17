@@ -87,7 +87,8 @@ namespace PokerEngine.Engine
             if (remaining <= 1)
             {
                 var winner = state.Players.First(p => !p.IsFolded);
-                var potTotal = state.TotalContributions.Values.Sum();
+                var pots = _potManager.BuildPots(state, new[] { winner.Id });
+                var potTotal = pots.Sum(p => p.Amount);
                 winner.ReceivePayout(potTotal);
                 state.HandComplete = true;
                 state.Phase = GamePhase.Complete;

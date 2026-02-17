@@ -31,6 +31,28 @@ public class ChipStackAnimator : MonoBehaviour
     private void Awake()
     {
         LoadChipSprites();
+        VerifyCanvasParent();
+    }
+
+    private void VerifyCanvasParent()
+    {
+        Canvas parentCanvas = GetComponentInParent<Canvas>();
+        if (parentCanvas == null)
+        {
+            Debug.LogError($"ChipStackAnimator on {gameObject.name} is NOT under a Canvas! UI elements (flying chips) will not render!");
+            
+            // Try to fix it automatically
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas != null)
+            {
+                Debug.LogWarning("Moving ChipStackAnimator under Canvas...");
+                transform.SetParent(canvas.transform, false);
+            }
+            else
+            {
+                Debug.LogError("No Canvas found in scene! Chip animations will not work!");
+            }
+        }
     }
 
     private void LoadChipSprites()
@@ -44,17 +66,13 @@ public class ChipStackAnimator : MonoBehaviour
             }
             else
             {
-                Debug.LogError($"❌ Could not load chip sprite: chip{denom} from Resources folder!");
+                // Sprite not found - will use colored circle fallback
             }
         }
         
         if (chipSprites.Count == 0)
         {
-            Debug.LogError("❌ NO CHIP SPRITES LOADED for animations! Make sure chip images are in Assets/Resources/ folder!");
-        }
-        else
-        {
-            Debug.Log($"✅ ChipStackAnimator: Loaded {chipSprites.Count} chip sprites for animations");
+            Debug.LogWarning("No chip sprites loaded for animations! Using colored circle fallback. Add chip images to Assets/Resources/ folder.");
         }
     }
 
@@ -105,7 +123,9 @@ public class ChipStackAnimator : MonoBehaviour
     public IEnumerator AnimatePotToWinner(Transform potPosition, Transform winnerPosition, decimal amount)
     {
         if (potPosition == null || winnerPosition == null)
+        {
             yield break;
+        }
 
         // For winning, show more chips and make it more dramatic
         List<int> chipValues = GetChipValues(amount);
@@ -127,7 +147,8 @@ public class ChipStackAnimator : MonoBehaviour
             ));
         }
 
-        yield return new WaitForSeconds(chipFlyDuration * 1.5f + chipCount * delayBetweenChips * 0.5f);
+        float waitTime = chipFlyDuration * 1.5f + chipCount * delayBetweenChips * 0.5f;
+        yield return new WaitForSeconds(waitTime);
     }
 
     /// <summary>
@@ -271,6 +292,14 @@ public class ChipStackAnimator : MonoBehaviour
     /// </summary>
     private GameObject CreateFlyingChip(int chipValue)
     {
+        // Verify we're under a Canvas
+        Canvas parentCanvas = GetComponentInParent<Canvas>();
+        if (parentCanvas == null)
+        {
+            Debug.LogError("Cannot create flying chip - ChipStackAnimator is not under a Canvas!");
+            return null;
+        }
+        
         GameObject chip = new GameObject($"FlyingChip_{chipValue}");
         chip.transform.SetParent(transform);
         chip.transform.localScale = Vector3.one;
@@ -298,9 +327,44 @@ public class ChipStackAnimator : MonoBehaviour
             {
                 image.sprite = chipSprites[closest];
             }
+            else
+            {
+                // Fallback: Use colored circle if no sprites available
+                Texture2D texture = new Texture2D(64, 64);
+                Color chipColor = GetChipColor(chipValue);
+                Color[] pixels = new Color[64 * 64];
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    int x = i % 64;
+                    int y = i / 64;
+                    float dist = Vector2.Distance(new Vector2(x, y), new Vector2(32, 32));
+                    pixels[i] = dist < 30 ? chipColor : Color.clear;
+                }
+                texture.SetPixels(pixels);
+                texture.Apply();
+                
+                image.sprite = Sprite.Create(texture, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f));
+            }
         }
 
         return chip;
+    }
+
+    /// <summary>
+    /// Get a color for a chip value (fallback when sprites are missing).
+    /// </summary>
+    private Color GetChipColor(int value)
+    {
+        // Color coding by denomination
+        if (value >= 5000) return new Color(1f, 0.5f, 0f); // Orange
+        if (value >= 1000) return new Color(0.8f, 0f, 0.8f); // Purple
+        if (value >= 500) return new Color(0f, 0f, 1f); // Blue
+        if (value >= 100) return new Color(1f, 0f, 0f); // Red
+        if (value >= 50) return new Color(0f, 1f, 0f); // Green
+        if (value >= 25) return new Color(1f, 1f, 0f); // Yellow
+        if (value >= 10) return new Color(0f, 1f, 1f); // Cyan
+        if (value >= 5) return new Color(1f, 0.5f, 0.5f); // Light red
+        return new Color(0.8f, 0.8f, 0.8f); // Gray for $1
     }
 
     private int FindClosestDenomination(int value)
