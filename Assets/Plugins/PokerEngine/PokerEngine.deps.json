@@ -7,15 +7,15 @@
   "targets": {
     ".NETStandard,Version=v2.1": {},
     ".NETStandard,Version=v2.1/": {
-      "PokerEngine2/1.0.0": {
+      "PokerEngine/1.0.0": {
         "runtime": {
-          "PokerEngine2.dll": {}
+          "PokerEngine.dll": {}
         }
       }
     }
   },
   "libraries": {
-    "PokerEngine2/1.0.0": {
+    "PokerEngine/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

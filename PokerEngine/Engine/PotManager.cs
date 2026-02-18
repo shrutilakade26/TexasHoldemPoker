@@ -43,6 +43,7 @@ namespace PokerEngine.Engine
             decimal previousLevel = 0m;
 
             // Build side pots at each contribution level
+            // For each unique contribution level, create a pot for that slice
             foreach (var kvp in contributions)
             {
                 var currentLevel = kvp.Value;
@@ -50,22 +51,19 @@ namespace PokerEngine.Engine
                 
                 if (slice > 0)
                 {
-                    // Count all contributors at or above this level
-                    var contributorsAtThisLevel = contributions
+                    // All players who contributed AT LEAST this level contribute to this pot slice
+                    // This means players who contributed >= currentLevel (the current player's contribution)
+                    var contributorsForThisSlice = contributions
                         .Where(c => c.Value >= currentLevel)
                         .Select(c => c.Key)
                         .ToList();
                     
-                    // Also include contributors who contributed less but already processed
-                    var allContributors = contributions
-                        .Where(c => c.Value >= previousLevel && c.Value > 0)
-                        .Select(c => c.Key)
-                        .ToList();
+                    // Include the current player and all players who contributed more
+                    // The pot amount is: slice amount * number of contributors who reached at least currentLevel
+                    var amount = slice * contributorsForThisSlice.Count;
                     
-                    var amount = slice * allContributors.Count;
-                    
-                    // Eligible players for this pot: those who contributed AND are not folded
-                    var eligibleForPot = allContributors
+                    // Eligible players for this pot: those who contributed to this slice AND are not folded
+                    var eligibleForPot = contributorsForThisSlice
                         .Where(id => eligiblePlayers.Contains(id))
                         .ToArray();
                     
@@ -75,7 +73,7 @@ namespace PokerEngine.Engine
                     }
                     else if (amount > 0)
                     {
-                        // Dead money - no eligible players, add to previous pot or create orphan pot
+                        // Dead money - no eligible players for this slice, add to previous pot
                         if (pots.Count > 0)
                         {
                             var lastPot = pots[^1];
@@ -121,7 +119,22 @@ namespace PokerEngine.Engine
                 player.ReceivePayout(payout.Value);
             }
 
+            // NOTE: Contributions are NOT cleared here.
+            // The Unity PokerGameManager will clear them after animations using GameState.ClearPotContributions()
+
             return payouts;
+        }
+
+        /// <summary>
+        /// Clears all contributions after pot has been distributed.
+        /// </summary>
+        public void ClearContributions(GameState state)
+        {
+            foreach (var playerId in state.TotalContributions.Keys.ToList())
+            {
+                state.TotalContributions[playerId] = 0m;
+            }
+            state.Pots.Clear();
         }
     }
 

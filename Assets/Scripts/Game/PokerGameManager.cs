@@ -370,6 +370,15 @@ public class PokerGameManager : MonoBehaviour, IGameObserver
             }
         }
 
+        // Clear pot contributions after animations are complete so UI shows $0 pot
+        gameState.ClearPotContributions();
+        
+        // Update UI to reflect cleared pot
+        if (uiManager != null)
+        {
+            uiManager.UpdateGameState(gameState);
+        }
+
         // 5. Check for game over
         var playersWithChips = gameState.Players.Count(p => p.Stack > 0);
         if (playersWithChips <= 1)

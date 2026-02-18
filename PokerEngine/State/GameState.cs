@@ -84,5 +84,18 @@ namespace PokerEngine.State
         public Player GetPlayerBySeat(int seat) => _players.First(p => p.SeatIndex == seat);
 
         public IEnumerable<Player> ActivePlayers() => _players.Where(p => !p.IsFolded);
+
+        /// <summary>
+        /// Clears all pot contributions after winnings have been distributed.
+        /// Should be called after pot distribution animations are complete.
+        /// </summary>
+        public void ClearPotContributions()
+        {
+            foreach (var playerId in TotalContributions.Keys.ToList())
+            {
+                TotalContributions[playerId] = 0m;
+            }
+            Pots.Clear();
+        }
     }
 }
